@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Self-contained by design: no <link> or external reference of any kind.
+     Every reference in this file must resolve to a file inside game/
+     (the make.fun gate checks each one); a favicon link — even a data:
+     URI — fails that check, so this page deliberately ships without one. -->
 <title>NEON BREACH — three.js tactical FPS</title>
-<link rel="icon" href="data:,">
 <style>
   /* Palette and the crosshair spread variable the game drives. */
   :root {
