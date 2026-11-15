@@ -1,0 +1,1 @@
+{"description":"NEON BREACH — a three.js tactical FPS. Build with: node main.ts","name":"threejs-tactical-fps","private":true,"scripts":{"build":"node main.ts"},"type":"module"}
