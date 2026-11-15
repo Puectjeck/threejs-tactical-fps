@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEON BREACH — three.js tactical FPS</title>
+<link rel="icon" href="data:,">
+<style>
+  /* Palette and the crosshair spread variable the game drives. */
+  :root {
+    --hud: #e8f6ff;
+    --accent: #ffb02e;
+    --danger: #ff4545;
+    --ok: #57ff9a;
+    --sp: 10px;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0b0f16;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    color: var(--hud);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #game-canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+  }
+  #crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+  }
+  #crosshair .l {
+    position: absolute;
+    background: rgba(232, 246, 255, .92);
+    box-shadow: 0 0 4px rgba(0, 0, 0, .8);
+  }
+  #crosshair .t {
+    width: 2px;
+    height: 9px;
+    left: -1px;
+    top: calc(-9px - var(--sp));
+  }
+  #crosshair .b {
+    width: 2px;
+    height: 9px;
+    left: -1px;
+    top: var(--sp);
+  }
+  #crosshair .lf {
+    width: 9px;
+    height: 2px;
+    top: -1px;
+    left: calc(-9px - var(--sp));
+  }
+  #crosshair .rt {
+    width: 9px;
+    height: 2px;
+    top: -1px;
+    left: var(--sp);
+  }
+  #crosshair .dot {
+    width: 2px;
+    height: 2px;
+    left: -1px;
+    top: -1px;
+  }
+  #hitmarker {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    opacity: 0;
+  }
+  #hitmarker .h {
+    position: absolute;
+    width: 10px;
+    height: 2px;
+    background: #fff;
+    box-shadow: 0 0 5px rgba(0, 0, 0, .9);
+  }
+  #hitmarker .h1 { transform: translate(-14px, -8px) rotate(45deg); }
+  #hitmarker .h2 { transform: translate(4px, -8px) rotate(-45deg); }
+  #hitmarker .h3 { transform: translate(-14px, 6px) rotate(-45deg); }
+  #hitmarker .h4 { transform: translate(4px, 6px) rotate(45deg); }
+  #hitmarker.kill .h { background: var(--danger); }
+
+  .panel {
+    background: rgba(8, 14, 22, .55);
+    border: 1px solid rgba(140, 200, 255, .25);
+    border-radius: 6px;
+    padding: 8px 12px;
+    backdrop-filter: blur(2px);
+  }
+  #hud-topleft {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    min-width: 210px;
+  }
+  #hp-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  #hp-num {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  #hp-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    opacity: .75;
+  }
+  #hp-track {
+    height: 8px;
+    background: rgba(255, 255, 255, .14);
+    border-radius: 4px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  #hp-bar {
+    height: 100%;
+    width: 100%;
+    background: var(--ok);
+    transition: width .12s linear;
+  }
+  #hud-bottomright {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    text-align: right;
+    min-width: 170px;
+  }
+  #ammo-mag {
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  #ammo-reserve {
+    font-size: 16px;
+    opacity: .8;
+  }
+  #weapon-name {
+    font-size: 11px;
+    letter-spacing: 2px;
+    opacity: .75;
+    margin-top: 2px;
+  }
+  #reload-hint {
+    font-size: 12px;
+    color: var(--accent);
+    height: 15px;
+    margin-top: 2px;
+  }
+  #hud-topcenter {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  #wave-label {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+  }
+  #enemies-label {
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: .85;
+    margin-top: 2px;
+  }
+  #hud-topright {
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    text-align: right;
+  }
+  #score-label {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  #score-sub {
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: .8;
+  }
+  #killfeed {
+    margin-top: 8px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    text-align: right;
+  }
+  #killfeed div {
+    opacity: .95;
+    text-shadow: 0 1px 3px #000;
+  }
+  #killfeed .hs {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  #banner {
+    position: absolute;
+    left: 50%;
+    top: 30%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  #banner-title {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    text-shadow: 0 0 22px rgba(255, 176, 46, .55), 0 2px 6px #000;
+  }
+  #banner-sub {
+    font-size: 15px;
+    letter-spacing: 2px;
+    opacity: .9;
+    margin-top: 6px;
+  }
+  #damage-vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(255, 30, 30, .5) 100%);
+  }
+  #lowhp {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 58%, rgba(200, 0, 0, .55) 100%);
+  }
+  #direction-hit {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    opacity: 0;
+  }
+  #direction-hit .arc {
+    position: absolute;
+    left: -42px;
+    top: -118px;
+    width: 84px;
+    height: 34px;
+    border-top: 5px solid rgba(255, 60, 60, .9);
+    border-radius: 50%;
+  }
+
+  /* ---------- Menus ---------- */
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 35%, rgba(24, 42, 66, .88), rgba(5, 8, 13, .96));
+    text-align: center;
+    padding: 24px;
+    z-index: 10;
+  }
+  .screen h1 {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: 8px;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255, 176, 46, .5);
+  }
+  .screen h1 .neon { color: var(--accent); }
+  .screen h2 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+  }
+  .tagline {
+    letter-spacing: 3px;
+    font-size: 13px;
+    opacity: .85;
+    margin-top: 8px;
+  }
+  .controls {
+    margin: 26px 0 8px;
+    font-size: 14.5px;
+    line-height: 1.85;
+    opacity: .95;
+  }
+  .controls b {
+    display: inline-block;
+    min-width: 118px;
+    text-align: right;
+    margin-right: 12px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .btn {
+    pointer-events: auto;
+    cursor: pointer;
+    margin-top: 22px;
+    background: var(--accent);
+    color: #131313;
+    border: none;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    padding: 14px 44px;
+    border-radius: 6px;
+    box-shadow: 0 0 24px rgba(255, 176, 46, .35);
+  }
+  .btn:hover { background: #ffc95e; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--hud);
+    border: 1px solid rgba(200, 230, 255, .5);
+    box-shadow: none;
+    margin-left: 10px;
+  }
+  .small {
+    font-size: 12px;
+    opacity: .65;
+    margin-top: 16px;
+    letter-spacing: 1px;
+  }
+  #over-stats {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+  #over-stats b { color: var(--accent); }
+  #pause-menu, #over-menu { display: none; }
+  #webgl-error { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <div id="crosshair">
+    <div class="l t"></div>
+    <div class="l b"></div>
+    <div class="l lf"></div>
+    <div class="l rt"></div>
+    <div class="l dot"></div>
+  </div>
+  <div id="hitmarker">
+    <div class="h h1"></div>
+    <div class="h h2"></div>
+    <div class="h h3"></div>
+    <div class="h h4"></div>
+  </div>
+  <div id="direction-hit"><div class="arc"></div></div>
+
+  <div class="panel" id="hud-topleft">
+    <div id="hp-row">
+      <div id="hp-num">100</div>
+      <div id="hp-label">INTEGRITY</div>
+    </div>
+    <div id="hp-track"><div id="hp-bar"></div></div>
+  </div>
+
+  <div class="panel" id="hud-bottomright">
+    <div>
+      <span id="ammo-mag">30</span>
+      <span id="ammo-reserve">/ 120</span>
+    </div>
+    <div id="weapon-name">VK-7 CARBINE · AUTO</div>
+    <div id="reload-hint"></div>
+  </div>
+
+  <div class="panel" id="hud-topcenter">
+    <div id="wave-label">WAVE 1</div>
+    <div id="enemies-label">HOSTILES 0</div>
+  </div>
+
+  <div id="hud-topright">
+    <div class="panel">
+      <div id="score-label">0</div>
+      <div id="score-sub">SCORE</div>
+    </div>
+    <div id="killfeed"></div>
+  </div>
+
+  <div id="banner">
+    <div id="banner-title"></div>
+    <div id="banner-sub"></div>
+  </div>
+</div>
+
+<div id="damage-vignette"></div>
+<div id="lowhp"></div>
+
+<div class="screen" id="menu">
+  <h1>NEON <span class="neon">BREACH</span></h1>
+  <div class="tagline">TACTICAL FPS · HOLD THE COMPOUND · 10 WAVES</div>
+  <div class="controls">
+    <div><b>W A S D</b> move</div>
+    <div><b>MOUSE</b> look · <b>CLICK</b> fire</div>
+    <div><b>RIGHT CLICK</b> aim down sights</div>
+    <div><b>SHIFT</b> sprint · <b>CTRL / C</b> crouch · <b>SPACE</b> jump</div>
+    <div><b>R</b> reload · <b>B</b> fire mode · <b>M</b> mute</div>
+  </div>
+  <button class="btn" id="btn-play">DEPLOY</button>
+  <div class="small">Best played with sound on. Click DEPLOY to lock the mouse; ESC pauses.</div>
+</div>
+
+<div class="screen" id="pause-menu">
+  <h2>PAUSED</h2>
+  <div class="tagline">THE COMPOUND WAITS FOR NO ONE</div>
+  <div>
+    <button class="btn" id="btn-resume">RESUME</button>
+    <button class="btn secondary" id="btn-restart">RESTART</button>
+  </div>
+</div>
+
+<div class="screen" id="over-menu">
+  <h2 id="over-title">SIGNAL LOST</h2>
+  <div id="over-stats"></div>
+  <button class="btn" id="btn-again">REDEPLOY</button>
+</div>
+
+<div class="screen" id="webgl-error">
+  <h2>WEBGL UNAVAILABLE</h2>
+  <div class="tagline">THIS GAME NEEDS A BROWSER WITH WEBGL ENABLED</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.min.js"
+  }
+}
+</script>
+<script type="module" src="./game.js"></script>
+</body>
+</html>
